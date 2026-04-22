@@ -6,3 +6,6 @@ struct matrix {
     int* cols;
     double* data;
 }typedef matrix;
+
+void printMatrix(matrix* m);
+void freeMatrix(matrix* m);

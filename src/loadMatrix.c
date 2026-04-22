@@ -4,7 +4,7 @@
 #include "mmio.h"
 #include "helper.h"
 
-int loadMatrix(char* filename){
+matrix* loadMatrix(char* filename){
     int ret_code;
     MM_typecode matcode;
     FILE *f;
@@ -12,14 +12,14 @@ int loadMatrix(char* filename){
     int i, *I, *J;
     double *val;
 
-    if (argc < 2)
+    if (filename == NULL)
 	{
 		fprintf(stderr, "Usage: %s [martix-market-filename]\n", filename);
 		exit(1);
 	}
     else    
     { 
-        if ((f = fopen(argv[1], "r")) == NULL) 
+        if ((f = fopen(filename, "r")) == NULL) 
             exit(1);
     }
 
@@ -76,12 +76,6 @@ int loadMatrix(char* filename){
     m->cols = J;
     m->data = val;
     m->nnz = nz;
-
-
-    mm_write_banner(stdout, matcode);
-    mm_write_mtx_crd_size(stdout, M, N, nz);
-    for (i=0; i<nz; i++)
-        fprintf(stdout, "%d %d %20.19g\n", I[i]+1, J[i]+1, val[i]);
 
 	return m;
 }
