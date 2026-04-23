@@ -10,7 +10,7 @@ matrix* loadMatrix(char* filename){
     FILE *f;
     int M, N, nz;   
     int i, *I, *J;
-    double *val;
+    float *val;
 
     if (filename == NULL)
 	{
@@ -51,7 +51,7 @@ matrix* loadMatrix(char* filename){
 
     I = (int *) malloc(nz * sizeof(int));
     J = (int *) malloc(nz * sizeof(int));
-    val = (double *) malloc(nz * sizeof(double));
+    val = (float *) malloc(nz * sizeof(float));
 
 
     /* NOTE: when reading in doubles, ANSI C requires the use of the "l"  */
@@ -60,7 +60,7 @@ matrix* loadMatrix(char* filename){
 
     for (i=0; i<nz; i++)
     {
-        fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+        fscanf(f, "%d %d %f\n", &I[i], &J[i], &val[i]);
         I[i]--;  /* adjust from 1-based to 0-based */
         J[i]--;
     }
@@ -76,6 +76,8 @@ matrix* loadMatrix(char* filename){
     m->cols = J;
     m->data = val;
     m->nnz = nz;
+    m->nRows = M;
+    m->nCols = N;
 
 	return m;
 }

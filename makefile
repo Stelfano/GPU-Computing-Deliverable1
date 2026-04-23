@@ -1,31 +1,33 @@
 CC=gcc
 
-LIB_FLAGS=-lm 
+# -lm va solo nel link finale, -fopenmp va ovunque
+LIB_FLAGS=-lm -fopenmp
+CFLAGS = -I$(INCLUDE_FOLDER) -fopenmp
 
 BIN_FOLDER := bin
 OBJ_FOLDER := obj
 SRC_FOLDER := src
 INCLUDE_FOLDER := include
 
-CFLAGS = -I $(INCLUDE_FOLDER)
-
 MAIN_NAME=spvm
 MAIN_BIN=$(MAIN_NAME)
-MAIN_SRC=$(MAIN_NAME).c
+MAIN_SRC=$(SRC_FOLDER)/$(MAIN_NAME).c
 
 OBJECTS=$(OBJ_FOLDER)/loadMatrix.o $(OBJ_FOLDER)/helper.o $(OBJ_FOLDER)/mmio.o
 
 all: $(BIN_FOLDER)/$(MAIN_BIN)
 
-$(OBJ_FOLDER)/mmio.o : $(SRC_FOLDER)/mmio.c
-	$(CC) -c $^ -o $@ $(LIB_FLAGS) $(CFLAGS)
+$(OBJ_FOLDER):
+	mkdir -p $(OBJ_FOLDER)
 
-$(OBJ_FOLDER)/helper.o : $(SRC_FOLDER)/helper.c
-	$(CC) -c $^ -o $@ $(LIB_FLAGS) $(CFLAGS)
+# Regola generica per i file oggetto: compila solo il file .c ($<)
+$(OBJ_FOLDER)/%.o : $(SRC_FOLDER)/%.c | $(OBJ_FOLDER)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_FOLDER)/loadMatrix.o : $(SRC_FOLDER)/loadMatrix.c $(OBJ_FOLDER)/helper.o $(OBJ_FOLDER)/mmio.o
-	$(CC) -c $^ -o $@ $(LIB_FLAGS) $(CFLAGS)
-
-$(BIN_FOLDER)/$(MAIN_BIN): $(SRC_FOLDER)/$(MAIN_SRC) $(OBJECTS)
+# Il link finale: unisce tutti gli oggetti e il sorgente del main
+$(BIN_FOLDER)/$(MAIN_BIN): $(MAIN_SRC) $(OBJECTS)
 	mkdir -p $(BIN_FOLDER)
-	$(CC) $^ -o $@ $(LIB_FLAGS) $(CFLAGS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIB_FLAGS)
+
+clean:
+	rm -rf $(OBJ_FOLDER) $(BIN_FOLDER)
