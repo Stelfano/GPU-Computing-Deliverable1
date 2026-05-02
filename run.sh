@@ -10,4 +10,6 @@
 #SBATCH --output=test-%j.out
 #SBATCH --error=test-%j.err
 
+module load CUDA/11.8.0
+
 ./bin/spvm $1
