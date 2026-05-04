@@ -1,39 +1,33 @@
 #include "function.cuh"
-#include "stdio.h"
+#include <stdio.h>
 #include <cuda_runtime.h>
 
-__global__ void spmv_coo_kernel_ptr(const matrix* A, const float* x, float* y) {
+__global__ void spmv_coo_scalar(const dtype* GPUvalues, const int *GPUrows, const int *GPUcols, int nnz, dtype * res, dtype *ref) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int totalThreads = gridDim.x*blockDim.x;
 
-    printf("Thread %d processing element %d\n", threadIdx.x, i);
-    // Accediamo ai campi con l'operatore freccia ->
-    if (i < A->nnz) {
-        int row = A->rows[i];
-        int col = A->cols[i];
-        double val = A->data[i];
-
-        atomicAdd(&y[row], val * x[col]);
+    for (int idx = i; idx < nnz; idx += totalThreads) {
+        atomicAdd(&res[GPUrows[idx]], GPUvalues[idx] * ref[GPUcols[idx]]);
     }
+
+    printf("Thread %d finished processing.\n", i);
 }
 
-matrix* copyMatrixGPU(const matrix *m) {
-    matrix* mat; // Copia locale della struct (su CPU)
+void copyMatrixGPU(const matrix *m, dtype* GPUvalues, int* GPUrows, int* GPUcols, int nnz) {
 
-    cudaMallocManaged(&mat, sizeof(matrix));
-    cudaMallocManaged(&mat->rows, m->nnz * sizeof(int));
-    cudaMallocManaged(&mat->cols, m->nnz * sizeof(int));
-    cudaMallocManaged(&mat->data, m->nnz * sizeof(double));
+    cudaMalloc(&GPUvalues, nnz * sizeof(dtype));
+    cudaMalloc(&GPUrows, nnz * sizeof(int));
+    cudaMalloc(&GPUcols, nnz * sizeof(int));
 
-    mat->nnz = m->nnz;
-    mat->nRows = m->nRows;
-    mat->nCols = m->nCols;
+    cudaMemcpy(GPUvalues, m->data, nnz*sizeof(dtype), cudaMemcpyHostToDevice);
+    cudaMemcpy(GPUrows, m->rows, nnz*sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(GPUcols, m->cols, nnz*sizeof(int), cudaMemcpyHostToDevice);
 
-    return mat;
+    printf("Matrix copied to GPU");
 }
 
-void freeCooMatrix(matrix* m) {
-    cudaFree(m->rows);
-    cudaFree(m->cols);
-    cudaFree(m->data);
-    cudaFree(m);
+void freeCooMatrixGPU(dtype* GPUvalues, int* GPUrows, int* GPUcols){
+    cudaFree(GPUvalues);
+    cudaFree(GPUrows);
+    cudaFree(GPUcols);
 }

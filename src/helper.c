@@ -21,20 +21,20 @@ void freeMatrix(matrix* m){
     free(m);
 }
 
-float* generateRandomVector(int size, int maxVal){
+dtype* generateRandomVector(int size, int maxVal){
     srand(42);
-    float* vector = (float*)malloc(size * sizeof(float));
+    dtype* vector = (dtype*)malloc(size * sizeof(dtype));
 
 
     for (int i = 0; i < size; i++) {
-        vector[i] = ((float)rand() / (float)RAND_MAX) * maxVal; // Generate random float between 0 and 1
+        vector[i] = (dtype)(rand() % maxVal);
     }
 
     return vector;
 }
 
-float* CPUspvm(matrix *m, float* vector){
-    float* y = (float *)malloc(sizeof(float) * m->nRows);
+dtype* CPUspvm(matrix *m, dtype* vector){
+    dtype* y = (dtype *)malloc(sizeof(dtype) * m->nRows);
 
     for (int i = 0; i < m->nRows; i++) {
         y[i] = 0.0;
@@ -43,18 +43,18 @@ float* CPUspvm(matrix *m, float* vector){
     for (int i = 0; i < m->nnz; i++) {
         int r = m->rows[i];
         int c = m->cols[i];
-        float val = m->data[i];
+        dtype val = m->data[i];
         y[r] += val * vector[c];
     }
 
     return y;
 }
 
-float* CPUspvmParallel(matrix *m, float* vector){
+dtype* CPUspvmParallel(matrix *m, dtype* vector){
     omp_set_num_threads(4);
 
     printf("\nExecuting CPU Spvm with openmp threads...\n", omp_get_num_threads());
-    float* y = (float *)malloc(sizeof(float) * m->nRows);
+    dtype* y = (dtype *)malloc(sizeof(dtype) * m->nRows);
 
     #pragma omp parallel for
     for (int i = 0; i < m->nRows; i++) {
@@ -65,7 +65,7 @@ float* CPUspvmParallel(matrix *m, float* vector){
     for (int i = 0; i < m->nnz; i++) {
         int r = m->rows[i];
         int c = m->cols[i];
-        float val = m->data[i];
+        dtype val = m->data[i];
 
         #pragma omp atomic
         y[r] += val * vector[c];
@@ -84,7 +84,7 @@ CSRMatrix* cooToCSR(matrix *coo) {
     // 1. Allocazione memoria
     csr->row_ptr = (int *)calloc(csr->nRows + 1, sizeof(int));
     csr->col_indices = (int *)malloc(csr->nnz * sizeof(int));
-    csr->data = (float *)malloc(csr->nnz * sizeof(float));
+    csr->data = (dtype *)malloc(csr->nnz * sizeof(dtype));
 
     // 2. Contiamo gli elementi per ogni riga
     for (int i = 0; i < coo->nnz; i++) {
@@ -136,8 +136,8 @@ void freeCSR(CSRMatrix *m){
     free(m);
 }
 
-float *CPUspvmCSR(CSRMatrix *m, float* vector){
-    float* y = (float *)malloc(sizeof(float) * m->nRows);
+ dtype *CPUspvmCSR(CSRMatrix *m, dtype* vector){
+    dtype* y = (dtype *)malloc(sizeof(dtype) * m->nRows);
 
     for (int i = 0; i < m->nRows; i++) {
         y[i] = 0.0;
@@ -146,7 +146,7 @@ float *CPUspvmCSR(CSRMatrix *m, float* vector){
     for (int i = 0; i < m->nRows; i++) {
         for (int j = m->row_ptr[i]; j < m->row_ptr[i + 1]; j++) {
             int col = m->col_indices[j];
-            float val = m->data[j];
+            dtype val = m->data[j];
             y[i] += val * vector[col];
         }
     }
@@ -154,11 +154,11 @@ float *CPUspvmCSR(CSRMatrix *m, float* vector){
     return y;
 }
 
-float *CPUspvmParallelCSR(CSRMatrix *m, float* vector){
+dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector){
     omp_set_num_threads(4);
 
     printf("\nExecuting CPU Spvm with openmp threads...\n", omp_get_num_threads());
-    float* y = (float *)malloc(sizeof(float) * m->nRows);
+    dtype* y = (dtype *)malloc(sizeof(dtype) * m->nRows);
 
     #pragma omp parallel for
     for (int i = 0; i < m->nRows; i++) {
@@ -169,7 +169,7 @@ float *CPUspvmParallelCSR(CSRMatrix *m, float* vector){
     for (int i = 0; i < m->nRows; i++) {
         for (int j = m->row_ptr[i]; j < m->row_ptr[i + 1]; j++) {
             int col = m->col_indices[j];
-            float val = m->data[j];
+            dtype val = m->data[j];
 
             #pragma omp atomic
             y[i] += val * vector[col];
@@ -179,7 +179,7 @@ float *CPUspvmParallelCSR(CSRMatrix *m, float* vector){
     return y;
 }
 
-int compareVectors(float* a, float* b, int size, float tolerance) {
+int compareVectors(dtype* a, dtype* b, int size, dtype tolerance) {
     for (int i = 0; i < size; i++) {
         if (fabs(a[i] - b[i]) > tolerance) {
             return 0; 

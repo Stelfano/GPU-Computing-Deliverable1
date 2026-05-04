@@ -3,11 +3,7 @@
 #ifndef HELPER_H
 #define HELPER_H
 #include <sys/time.h>
-
-#define TIMER_DEF     struct timeval temp_1, temp_2
-#define TIMER_START   gettimeofday(&temp_1, (struct timezone*)0)
-#define TIMER_STOP    gettimeofday(&temp_2, (struct timezone*)0)
-#define TIMER_ELAPSED ((temp_2.tv_sec-temp_1.tv_sec)*1000.0 +(temp_2.tv_usec-temp_1.tv_usec)/1000.0) // return ms
+#define dtype float
 
 typedef struct {
     int nnz;
@@ -30,16 +26,17 @@ typedef struct {
 void printMatrix(matrix* m);
 void freeMatrix(matrix* m);
 
-float* generateRandomVector(int size, int maxVal);
-float* CPUspvm(matrix *m, float* vector);
-float* CPUspvmParallel(matrix *m, float* vector);
+
+dtype* generateRandomVector(int size, int maxVal);
+dtype* CPUspvm(matrix *m, dtype* vector);
+dtype* CPUspvmParallel(matrix *m, dtype* vector);
 
 CSRMatrix* cooToCSR(matrix* m);
 void printCSR(CSRMatrix *m);
 void freeCSR(CSRMatrix *m);
-float *CPUspvmCSR(CSRMatrix *m, float* vector);
-float *CPUspvmParallelCSR(CSRMatrix *m, float* vector);
+dtype *CPUspvmCSR(CSRMatrix *m, dtype* vector);
+dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector);
 
-int compareVectors(float* a, float* b, int size, float tolerance);
+int compareVectors(dtype* a, dtype* b, int size, dtype tolerance);
 
 #endif

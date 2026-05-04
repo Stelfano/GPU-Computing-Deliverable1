@@ -20,64 +20,68 @@ int main(int argc, char* argv[]){
     printf("Printing matrix\n");
     printMatrix(m);
 
-    float* ref = generateRandomVector(m->nRows, 10);
+    dtype* ref = generateRandomVector(m->nRows, 10);
+
+    //-------------COO--------------------
+
     gettimeofday(&start, NULL);
-    float* res = CPUspvmParallel(m, ref);
+    dtype* res = CPUspvm(m, ref);
     gettimeofday(&end, NULL);
     printf("CPU Spmv time: %f ms\n", ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0));
 
-    printf("\nFinal res:\n");
-    for(int i=0;i<m->nRows;i++){
-        printf("%d : %f\n",i , res[i]);
-    }
+    //------------CSR----------------------
 
-    printf("Convert to CSR format\n");
     CSRMatrix* csr = cooToCSR(m);
-    printCSR(csr);
+    dtype* resCSR = CPUspvmCSR(csr, ref);
 
-    float* resCSR = CPUspvmCSR(csr, ref);
-    printf("\nFinal res with CSR:\n");
-    for(int i=0;i<csr->nCols;i++){
-        printf("%d : %f\n",i , resCSR[i]);
-    }
+    //----------------GPU-COO---------------------
+    dtype *Gpuref, *GPURes, *GPUvalues;
+    int *GPUrows, *GPUcols;
+    int nnz = m->nnz;
 
-    matrix *mat = copyMatrixGPU(m);
-    float* GpuVector = (float*)malloc(m->nCols * sizeof(float));
-    float* gpuRes = (float*)malloc(m->nRows * sizeof(float));
+    printf("Number of non-zero elements: %d\n", nnz);
 
-    cudaMallocManaged(&GpuVector, m->nCols * sizeof(float));
-    cudaMallocManaged(&gpuRes, m->nRows * sizeof(float));
-    //calculate time for GPU Spmv
+    copyMatrixGPU(m, GPUvalues, GPUrows, GPUcols, nnz);
 
+    cudaMalloc(&Gpuref, m->nRows * sizeof(dtype));
+    cudaMemcpy(Gpuref, ref, m->nRows * sizeof(dtype), cudaMemcpyHostToDevice);
+    cudaMalloc(&GPURes, m->nRows * sizeof(dtype));
 
     gettimeofday(&start, NULL);
+    
+    //Maybe this shoud go in ad macro at some point
+    int num_blocks = (nnz + 255) / 256;
+    int threads_per_block = 256;
 
-    //Start the kernel for Spmv
-    int blockSize = 256;
-    int numBlocks = (m->nnz + blockSize - 1) / blockSize;
-    spmv_coo_kernel_ptr<<<numBlocks, blockSize>>>(mat, GpuVector, gpuRes);
+    spmv_coo_scalar<<<num_blocks, threads_per_block>>>(GPUvalues, GPUrows, GPUcols, nnz, GPURes, Gpuref);
     cudaDeviceSynchronize();
+
+    cudaMemcpy(res, GPURes, m->nRows * sizeof(dtype), cudaMemcpyDeviceToHost);
     gettimeofday(&end, NULL);
+
     printf("GPU Spmv time: %f ms\n", ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0));
-    printf("\nFinal res with GPU:\n");
-    for(int i=0;i<m->nRows;i++){
-        printf("%d : %f\n",i , gpuRes[i]);
+    printf("\nFinal result between GPU:\n");
+
+    for(int i = 0;i<m->nRows; i++){
+        printf("%d = %f\n", i, fabs(res[i]));
     }
-    if(compareVectors(gpuRes, resCSR, m->nRows, TOLERANCE)){
+
+    if(compareVectors(res, resCSR, m->nRows, TOLERANCE) == 1){
         printf("\nResults are approximately equal within the tolerance.\n");
     } else {
         printf("\nResults differ beyond the tolerance.\n");
     }
 
-
-    freeCooMatrix(mat);
-
-    freeMatrix(m);
+    //------------- FREE MEMORY ----------------
     free(ref);
     free(res);
 
     freeCSR(csr);
     free(resCSR);
+
+    cudaFree(Gpuref);
+    cudaFree(GPURes);
+    freeCooMatrixGPU(GPUvalues, GPUrows, GPUcols);
     
     return 0;
 }
