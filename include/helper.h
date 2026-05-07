@@ -4,6 +4,8 @@
 #define HELPER_H
 #include <sys/time.h>
 #define dtype float
+#define XSTR(x) STR(x)
+#define STR(x) #x
 
 typedef struct {
     int nnz;
@@ -21,6 +23,7 @@ typedef struct {
     int *row_ptr;    // Dimensione: rows + 1
     int *col_indices; // Dimensione: nnz
     float *data;   // Dimensione: nnz
+    int row_ptr_size; // Dimensione di row_ptr
 } CSRMatrix;
 
 void printMatrix(matrix* m);
@@ -38,5 +41,6 @@ dtype *CPUspvmCSR(CSRMatrix *m, dtype* vector);
 dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector);
 
 int compareVectors(dtype* a, dtype* b, int size, dtype tolerance);
+void printExperimentBanner(const char* title, int numThreads, int numBlocks, int nnz);
 
 #endif

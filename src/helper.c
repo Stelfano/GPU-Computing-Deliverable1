@@ -6,6 +6,7 @@
 
 #include "helper.h"
 
+
 void printMatrix(matrix* m){
     printf("The matrix is of size: %d, %d\n",m->nRows, m->nCols);
 
@@ -32,6 +33,8 @@ dtype* generateRandomVector(int size, int maxVal){
 
     return vector;
 }
+
+//-----------------CPU-COO---------------------
 
 dtype* CPUspvm(matrix *m, dtype* vector){
     dtype* y = (dtype *)malloc(sizeof(dtype) * m->nRows);
@@ -74,6 +77,7 @@ dtype* CPUspvmParallel(matrix *m, dtype* vector){
     return y;
 }
 
+//-----------------CPU-CSR---------------------
 
 CSRMatrix* cooToCSR(matrix *coo) {
     CSRMatrix* csr = (CSRMatrix * )malloc(sizeof(CSRMatrix));
@@ -90,6 +94,15 @@ CSRMatrix* cooToCSR(matrix *coo) {
     for (int i = 0; i < coo->nnz; i++) {
         csr->row_ptr[coo->rows[i]]++;
     }
+
+    // Conto il numero di righe con almeno un elemento non-zero
+    int nonZeroRows = 0;
+    for (int i = 0; i < csr->nRows; i++) {
+        if (csr->row_ptr[i] > 0) {
+            nonZeroRows++;
+        }
+    }
+    csr->row_ptr_size = nonZeroRows;
 
     // 3. Trasformiamo i conteggi in offset (Somma Prefissa)
     // row_ptr[i] ora indicherà dove inizia la riga i
@@ -179,11 +192,24 @@ dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector){
     return y;
 }
 
+//-----------------Utility---------------------
+
 int compareVectors(dtype* a, dtype* b, int size, dtype tolerance) {
     for (int i = 0; i < size; i++) {
         if (fabs(a[i] - b[i]) > tolerance) {
+            printf("Difference at index %d: %f vs %f\n", i, a[i], b[i]);
             return 0; 
         }
     }
     return 1; 
+}
+
+void printExperimentBanner(const char* title, int numThreads, int numBlocks, int nnz) {
+    printf("\n==============================\n");
+    printf("%s\n", title);
+    printf("Number of Threads: %d\n", numThreads);
+    printf("Number of Blocks: %d\n", numBlocks);
+    printf("Number of Non-Zero Elements: %d\n", nnz);
+    printf("Data Type: %s\n", XSTR(dtype));
+    printf("==============================\n");
 }

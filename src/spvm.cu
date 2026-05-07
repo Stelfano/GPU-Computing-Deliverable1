@@ -7,81 +7,141 @@ extern "C" {
 }
 #include "function.cuh"
 #include "cuda_runtime.h"
+#include "cusparse.h"
 
-#define TOLERANCE 1e-5
+#define TOLERANCE 1e-2
 
 int main(int argc, char* argv[]){
 
     matrix * m;
     struct timeval start, end;
+    float diffCPU, diffGPU;
 
     m = loadMatrix(argv[1]);
-
-    printf("Printing matrix\n");
-    printMatrix(m);
-
-    dtype* ref = generateRandomVector(m->nRows, 10);
+    dtype* ref = generateRandomVector(m->nCols, 10);
 
     //-------------COO--------------------
 
     gettimeofday(&start, NULL);
     dtype* res = CPUspvm(m, ref);
     gettimeofday(&end, NULL);
-    printf("CPU Spmv time: %f ms\n", ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0));
+    diffCPU = ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0);
+
 
     //------------CSR----------------------
-
+/*
     CSRMatrix* csr = cooToCSR(m);
-    dtype* resCSR = CPUspvmCSR(csr, ref);
 
-    //----------------GPU-COO---------------------
+    gettimeofday(&start, NULL);
+    dtype* resCSR = CPUspvmCSR(csr, ref);
+    gettimeofday(&end, NULL);
+    printf("CPU Spmv CSR time: %f ms\n", ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0));
+*/
+
+    //----------------GPU-COO-Scalar---------------------
+    printExperimentBanner("GPU COO-Scalar SpMV", 256, (m->nnz + 255) / 256, m->nnz);
+
     dtype *Gpuref, *GPURes, *GPUvalues;
     int *GPUrows, *GPUcols;
     int nnz = m->nnz;
+    dtype *resAux = (dtype*)malloc(m->nRows * sizeof(dtype));
 
     printf("Number of non-zero elements: %d\n", nnz);
 
-    copyMatrixGPU(m, GPUvalues, GPUrows, GPUcols, nnz);
-
-    cudaMalloc(&Gpuref, m->nRows * sizeof(dtype));
-    cudaMemcpy(Gpuref, ref, m->nRows * sizeof(dtype), cudaMemcpyHostToDevice);
+    copyMatrixGPU(m, &GPUvalues, &GPUrows, &GPUcols, nnz);
+    cudaMalloc(&Gpuref, m->nCols * sizeof(dtype));
+    cudaMemcpy(Gpuref, ref, m->nCols * sizeof(dtype), cudaMemcpyHostToDevice);
     cudaMalloc(&GPURes, m->nRows * sizeof(dtype));
+    cudaMemset(GPURes, 0, m->nRows * sizeof(dtype));
 
     gettimeofday(&start, NULL);
-    
+
     //Maybe this shoud go in ad macro at some point
     int num_blocks = (nnz + 255) / 256;
     int threads_per_block = 256;
 
     spmv_coo_scalar<<<num_blocks, threads_per_block>>>(GPUvalues, GPUrows, GPUcols, nnz, GPURes, Gpuref);
+    cudaError_t err = cudaDeviceSynchronize();
+    if(err != cudaSuccess) {
+        fprintf(stderr, "Error during COO-Scalar kernel execution: %s\n", cudaGetErrorString(err));
+        return -1;
+    }
+
+    if(cudaMemcpy(resAux, GPURes, m->nRows * sizeof(dtype), cudaMemcpyDeviceToHost) != cudaSuccess) {
+        fprintf(stderr, "Error copying result back to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+        return -1;
+    }
+
+    gettimeofday(&end, NULL);
     cudaDeviceSynchronize();
 
-    cudaMemcpy(res, GPURes, m->nRows * sizeof(dtype), cudaMemcpyDeviceToHost);
-    gettimeofday(&end, NULL);
+    diffGPU = ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0);
 
-    printf("GPU Spmv time: %f ms\n", ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0));
-    printf("\nFinal result between GPU:\n");
-
-    for(int i = 0;i<m->nRows; i++){
-        printf("%d = %f\n", i, fabs(res[i]));
-    }
-
-    if(compareVectors(res, resCSR, m->nRows, TOLERANCE) == 1){
-        printf("\nResults are approximately equal within the tolerance.\n");
+    printf("COO-Scalar time: %f ms\n", diffGPU);
+    printf("CPU COO time: %f ms\n", diffCPU);
+    if(compareVectors(res, resAux, m->nRows, TOLERANCE) == 1){
+        printf("Results are approximately equal within the tolerance.\n");
     } else {
-        printf("\nResults differ beyond the tolerance.\n");
+        printf("Results differ beyond the tolerance.\n");
     }
+
+
+    freeCooMatrixGPU(GPUvalues, GPUrows, GPUcols);
+    cudaFree(Gpuref);
+    cudaFree(GPURes);
+
+    //--------------CSR-SCALAR------------------
+
+    printExperimentBanner("GPU CSR-Scalar SpMV", 256, (m->nnz + 255) / 256, m->nnz);
+    printf("Number of non-zero elements: %d\n", nnz);
+
+    CSRMatrix* csr = cooToCSR(m);
+
+    copyCSRMatrixGPU(csr, &GPUvalues, &GPUrows, &GPUcols, nnz);
+    cudaMalloc(&Gpuref, csr->nCols * sizeof(dtype));
+    cudaMemcpy(Gpuref, ref, csr->nCols * sizeof(dtype), cudaMemcpyHostToDevice);
+    cudaMalloc(&GPURes, csr->nRows * sizeof(dtype));
+    cudaMemset(GPURes, 0, csr->nRows * sizeof(dtype));
+
+    gettimeofday(&start, NULL);
+
+    //Maybe this shoud go in ad macro at some point
+    spmv_csr_scalar<<<num_blocks, threads_per_block>>>(GPUvalues, GPUrows, GPUcols, nnz, GPURes, Gpuref, csr->row_ptr_size);
+    err = cudaDeviceSynchronize();
+    if(err != cudaSuccess) {
+        fprintf(stderr, "Error during CSR-scalar kernel execution: %s\n", cudaGetErrorString(err));
+        return -1;
+    }
+
+    if(cudaMemcpy(resAux, GPURes, m->nRows * sizeof(dtype), cudaMemcpyDeviceToHost) != cudaSuccess) {
+        fprintf(stderr, "Error copying result back to host: %s\n", cudaGetErrorString(cudaGetLastError()));
+        return -1;
+    }
+
+    gettimeofday(&end, NULL);
+    cudaDeviceSynchronize();
+
+    diffGPU = ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_usec - start.tv_usec) / 1000.0);
+
+    printf("CSR-Scalar time: %f ms\n", diffGPU);
+    printf("CPU COO time: %f ms\n", diffCPU);
+    if(compareVectors(res, resAux, csr->nRows, TOLERANCE) == 1){
+        printf("Results are approximately equal within the tolerance.\n");
+    } else {
+        printf("Results differ beyond the tolerance.\n");
+    }
+
+
+    //--------------CUSparse-COO---------------
+
+    
 
     //------------- FREE MEMORY ----------------
     free(ref);
     free(res);
-
     freeCSR(csr);
-    free(resCSR);
+    free(resAux);
 
-    cudaFree(Gpuref);
-    cudaFree(GPURes);
-    freeCooMatrixGPU(GPUvalues, GPUrows, GPUcols);
     
     return 0;
 }
