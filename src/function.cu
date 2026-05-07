@@ -63,3 +63,34 @@ void freeCSRMatrixGPU(dtype* GPUvalues, int* GPUrows, int* GPUcols){
     cudaFree(GPUrows);
     cudaFree(GPUcols);
 }
+
+//--------------------GPU-ELLPACK--------------------------
+void copyEllpackGPU(const EllpackMatrix* ell, dtype** GPUvalues, int **GPUcols, int maxRow, int nRows){
+    cudaMalloc(GPUvalues, maxRow * nRows * sizeof(dtype));
+    cudaMalloc(GPUcols, maxRow * nRows * sizeof(int));
+
+    cudaMemcpy(*GPUvalues, ell->values, maxRow * nRows *sizeof(dtype), cudaMemcpyHostToDevice);
+    cudaMemcpy(*GPUcols, ell->cols, maxRow * nRows *sizeof(dtype), cudaMemcpyHostToDevice);
+}
+
+__global__ void spmv_ell(const dtype* GPUvalues, const int* GPUcols, const int nRows, const int maxRow, dtype* res, const dtype* ref){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(idx < nRows){
+        dtype localSum = 0;
+
+        for(int i = 0; i < maxRow; i++){ 
+            int offset = idx + i * nRows;
+            
+            if(GPUcols[offset] != -1)
+                localSum += GPUvalues[offset] * ref[GPUcols[offset]];
+        }
+        res[idx] = localSum;
+    }
+}
+void freeEllpackGPU(dtype *GPUvalues, int *GPUcols){
+    cudaFree(GPUvalues);
+    cudaFree(GPUcols);
+}
+
+//-------------------HELLPACK-----------------------------

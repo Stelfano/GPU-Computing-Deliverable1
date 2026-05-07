@@ -26,9 +26,15 @@ typedef struct {
     int row_ptr_size; // Dimensione di row_ptr
 } CSRMatrix;
 
+typedef struct {
+    int nRows;          // Numero righe
+    int maxRow;          // Max elementi per riga
+    dtype *values;  
+    int *cols;      
+} EllpackMatrix;
+
 void printMatrix(matrix* m);
 void freeMatrix(matrix* m);
-
 
 dtype* generateRandomVector(int size, int maxVal);
 dtype* CPUspvm(matrix *m, dtype* vector);
@@ -39,6 +45,10 @@ void printCSR(CSRMatrix *m);
 void freeCSR(CSRMatrix *m);
 dtype *CPUspvmCSR(CSRMatrix *m, dtype* vector);
 dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector);
+
+EllpackMatrix* cooToEllpack(matrix *m);
+void freeEllpack(EllpackMatrix* ell);
+void printEllpack(EllpackMatrix *ell);
 
 int compareVectors(dtype* a, dtype* b, int size, dtype tolerance);
 void printExperimentBanner(const char* title, int numThreads, int numBlocks, int nnz);

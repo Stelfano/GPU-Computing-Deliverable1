@@ -3,8 +3,8 @@ NVCC=nvcc
 
 # -lm va solo nel link finale, -fopenmp va ovunque
 LIB_FLAGS=-lm 
-NVCC_LIB_FLAGS=-lm -Xcompiler -fopenmp -lcudart
-NVCC_FLAGS = -I$(INCLUDE_FOLDER) -Xcompiler "-fopenmp"
+NVCC_LIB_FLAGS=-L/etc/modulefilesRocky8/cuda/11.8 -lm -Xcompiler -fopenmp -lcudart -lcusparse
+NVCC_FLAGS = -I$(INCLUDE_FOLDER) -Xcompiler "-fopenmp" 
 CFLAGS = -I$(INCLUDE_FOLDER) -fopenmp
 
 BIN_FOLDER := bin
@@ -37,7 +37,7 @@ $(OBJ_FOLDER)/%.o: $(SRC_FOLDER)/%.cu | $(OBJ_FOLDER)
 # Il link finale: unisce tutti gli oggetti e il sorgente del main
 $(BIN_FOLDER)/$(MAIN_BIN): $(MAIN_SRC) $(OBJECTS)
 	mkdir -p $(BIN_FOLDER)
-	$(NVCC) $(NVCC_FLAGS) $^ -o $@ $(NVCC_LIB_FLAGS)
+	$(NVCC) $(NVCC_FLAGS) $^ -o $@ $(NVCC_LIB_FLAGS) 
 
 clean:
 	rm -rf $(OBJ_FOLDER) $(BIN_FOLDER)

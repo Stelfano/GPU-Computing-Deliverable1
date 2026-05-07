@@ -192,6 +192,70 @@ dtype *CPUspvmParallelCSR(CSRMatrix *m, dtype* vector){
     return y;
 }
 
+//-----------Ellpack-------------------
+
+EllpackMatrix* cooToEllpack(matrix* m){
+    EllpackMatrix* ell;
+    ell = (EllpackMatrix*)malloc(sizeof(EllpackMatrix));
+    ell->nRows = m->nRows;
+
+    // 1. Trova il massimo numero di elementi per riga (K)
+    int *row_counts = (int*)calloc(m->nRows, sizeof(int));
+    for (int i = 0; i < m->nnz; i++) {
+        row_counts[m->rows[i]]++;
+    }
+
+    int max_k = 0;
+    for (int i = 0; i < m->nRows; i++) {
+        if (row_counts[i] > max_k) max_k = row_counts[i];
+    }
+    ell->maxRow = max_k;
+
+    // 2. Alloca memoria per i dati ELLPACK (Storage Column-Major per performance GPU)
+    // Usiamo M * K per memorizzare tutto in un array lineare
+    ell->values = (dtype*)malloc(m->nRows * ell->maxRow * sizeof(dtype));
+    ell->cols   = (int*)malloc(m->nRows * ell->maxRow * sizeof(int));
+
+    // Inizializza con padding (valore 0 e colonna -1)
+    for (int i = 0; i < m->nRows * ell->maxRow; i++) {
+        ell->values[i] = 0.0f;
+        ell->cols[i]   = -1; 
+    }
+
+    int *current_row_pos = (int*)calloc(m->nRows, sizeof(int));
+    for (int i = 0; i < m->nnz; i++) {
+        int r = m->rows[i];
+        int c = m->cols[i];
+        dtype v = m->data[i];
+
+        int offset = r + (current_row_pos[r] * ell->maxRow); // Indice in formato Column-Major
+        ell->values[offset] = v;
+        ell->cols[offset]   = c;
+        
+        current_row_pos[r]++;
+    }
+
+    free(row_counts);
+    free(current_row_pos);
+    return ell;
+}
+
+void printEllpack(EllpackMatrix *ell){
+    for(int i = 0;i<ell->nRows;i++){
+        for(int j=0;j<ell->maxRow;j++){
+            printf(" %f ", ell->values);
+        }
+        printf("\n");
+    }
+}
+
+void freeEllpack(EllpackMatrix* ell){
+    free(ell->values);
+    free(ell->cols);
+}
+
+//-------------HELLPACK---------------
+
 //-----------------Utility---------------------
 
 int compareVectors(dtype* a, dtype* b, int size, dtype tolerance) {

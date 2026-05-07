@@ -9,5 +9,10 @@ void freeCooMatrixGPU(dtype* GPUvalues, int* GPUrows, int* GPUcols);
 
 __global__ void spmv_csr_scalar(const dtype* GPUvalues, const int* GPUrowPtr, const int *Gpucols, int nnz, dtype *res, dtype *ref, const int RowPtrSize);
 void copyCSRMatrixGPU(const CSRMatrix *m, dtype **GPUvalues, int** GPUrows, int** GPUcols, int nnz);
+void freeCSRMatrixGPU(dtype *GPUvalues, int* GPUrows, int* GPUcols);
+
+//--------------------GPU-ELLPACK--------------------------
+void copyEllpackGPU(const EllpackMatrix* ell, dtype** GPUvalues, int **GPUcols, int maxRow, int nRows);
+__global__ void spmv_ell(const dtype* GPUvalues, const int* GPUcols, const int nRows, const int maxRow, dtype* res, const dtype* ref);
 
 #endif
