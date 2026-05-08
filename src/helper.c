@@ -210,11 +210,17 @@ EllpackMatrix* cooToEllpack(matrix* m){
         if (row_counts[i] > max_k) max_k = row_counts[i];
     }
     ell->maxRow = max_k;
+    printf("maxRow: %d\n", max_k);
 
     // 2. Alloca memoria per i dati ELLPACK (Storage Column-Major per performance GPU)
     // Usiamo M * K per memorizzare tutto in un array lineare
     ell->values = (dtype*)malloc(m->nRows * ell->maxRow * sizeof(dtype));
     ell->cols   = (int*)malloc(m->nRows * ell->maxRow * sizeof(int));
+
+    if(ell->values == NULL || ell->cols == NULL){
+        fprintf(stderr, "Insufficient memory for ELLPACK\n");
+        exit(1);
+    }
 
     // Inizializza con padding (valore 0 e colonna -1)
     for (int i = 0; i < m->nRows * ell->maxRow; i++) {
@@ -228,10 +234,10 @@ EllpackMatrix* cooToEllpack(matrix* m){
         int c = m->cols[i];
         dtype v = m->data[i];
 
-        int offset = r + (current_row_pos[r] * ell->maxRow); // Indice in formato Column-Major
+        long offset = r + current_row_pos[r]*ell->nRows;
         ell->values[offset] = v;
-        ell->cols[offset]   = c;
-        
+        ell->cols[offset] = c;
+
         current_row_pos[r]++;
     }
 
@@ -241,11 +247,10 @@ EllpackMatrix* cooToEllpack(matrix* m){
 }
 
 void printEllpack(EllpackMatrix *ell){
-    for(int i = 0;i<ell->nRows;i++){
-        for(int j=0;j<ell->maxRow;j++){
-            printf(" %f ", ell->values);
-        }
-        printf("\n");
+    printf("MAXROW: %d", ell->maxRow);
+
+    for(int i = 0;i<ell->nRows * ell->maxRow;i++){
+        printf("%f\n",ell->values[i]);
     }
 }
 
@@ -255,6 +260,28 @@ void freeEllpack(EllpackMatrix* ell){
 }
 
 //-------------HELLPACK---------------
+
+HellpackMatrix *cooToHellpack(matrix *m, int sliceSize){
+    HellpackMatrix *hell = (HellpackMatrix *)malloc(sizeof(HellpackMatrix *));
+
+    hell->totalRows = m->nRows;
+    hell->sliceSize = sliceSize;
+
+    int matrixNum = ceil(hell->totalRows / sliceSize);
+
+    //We create one ellpack matrix that we resize
+    // 1. Trova il massimo numero di elementi per riga per ogni sottomatrice
+    for(int sub = 0;sub < matrixNum;sub++){
+        int *row_counts = (int*)calloc(m->sliceSize, sizeof(int));
+        for (int i = sub*sliceSize; i < m->nnz; i++) {
+            row_counts[m->rows[i]]++;
+        }
+    }
+
+
+
+}
+
 
 //-----------------Utility---------------------
 

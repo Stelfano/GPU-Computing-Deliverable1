@@ -79,13 +79,17 @@ __global__ void spmv_ell(const dtype* GPUvalues, const int* GPUcols, const int n
     if(idx < nRows){
         dtype localSum = 0;
 
-        for(int i = 0; i < maxRow; i++){ 
+       for (int i = 0; i < maxRow; i++) {
+            // Calcolo dell'offset in Column-Major
             int offset = idx + i * nRows;
             
-            if(GPUcols[offset] != -1)
-                localSum += GPUvalues[offset] * ref[GPUcols[offset]];
+            // Recupero l'indice di colonna
+            int col = GPUcols[offset];
+
+            if (col >= 0) {
+                res[idx] += GPUvalues[offset] * ref[col];
+            }
         }
-        res[idx] = localSum;
     }
 }
 void freeEllpackGPU(dtype *GPUvalues, int *GPUcols){
@@ -94,3 +98,6 @@ void freeEllpackGPU(dtype *GPUvalues, int *GPUcols){
 }
 
 //-------------------HELLPACK-----------------------------
+
+//Standard Hacked matrix without sorting
+

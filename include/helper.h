@@ -33,6 +33,16 @@ typedef struct {
     int *cols;      
 } EllpackMatrix;
 
+typedef struct{
+    int totalRows;
+    int sliceSize;
+    int *hackOffset;
+    int *nRows;
+    int *maxRows;
+    int *cols;
+    dtype *values;
+}HellpackMatrix;
+
 void printMatrix(matrix* m);
 void freeMatrix(matrix* m);
 
